@@ -1,0 +1,67 @@
+#
+# Configuration for template-based generation of CA configuration file
+#
+
+
+---
+# You can edit below this line until told otherwise
+# ----------------------------------------------------------------
+
+# This will be a part of your root certificate's Subject
+contryName: US  # Do NOT excepped 2 characters
+localityName: Queens
+stateName: NY  # Do NOT exceed 2 characters
+emailAddress: admin@bestwidgets.com
+organizationName: Widgets Inc.
+organizationalUnitName: Security Engineering Division
+
+# This is the parent directory of your CA. It understands both
+# shell expansion in the form of `~` as well as environment
+# variables with `$`
+base_directory: ~/
+
+# 4096 is a sane default if not a little too strong
+default_rsa_keysize: 4096
+
+# SHA512 seems like the best bet for now unless you're into RIPEMD160
+message_digest: sha512
+
+# I know what you're thinking. No key encryption?! That's bad!!
+# Well, every documented process that generates a private key
+# immediately then removes the encryption from the key so that it
+# can be used.
+# 
+# If you want to leave it encrypted for medium to long term storage
+# then go ahead and change this to yes but then you need an extra
+# step to decrypt it before using it. Just sayin'
+encrypt_key: no
+
+# This next value will be part of a filesystem path so choose it
+# with some sanity
+ca_short_name: widgetsInc
+
+# You can change these, but you ought not
+# ----------------------------------------------------------------
+# This two will be a part of your filesystem path, no spaces or
+# weird characters
+ca_basename: CA
+# This will be part of your Subject
+ca_description_suffix: Root Certificate Authority
+
+
+# DO NOT CHANGE ANYTHING BELOW THIS LINE !!
+# ----------------------------------------------------------------
+tmp_output_path: "{{ CURDIR }}/output"
+subject: "{{ ca_description }} {{ ca_description_suffix }}"
+commonName: "{{ ca_description }} {{ ca_description_suffix }}"
+ca_short_dirname: "{{ ca_basename }}-{{ ca_short_name }}"
+ca_fullpath_root: "{{ base_directory }}/{{ ca_short_dirname }}"
+openssl_cnf: "{{ ca_short_dirname }}.cnf"
+openssl_cnf_src: "{{ tmp_output_path }}/{{ openssl_cnf }}"
+openssl_cnf_dst: "{{ ca_fullpath_root }}/{{ openssl_cnf }}"
+path_serial: "{{ ca_fullpath_root }}/serial"
+path_index: "{{ ca_fullpath_root }}/index"
+path_signed_certs: "{{ ca_fullpath_root }}/signedcerts"
+path_private: "{{ ca_fullpath_root }}/private"
+path_requests: "{{ ca_fullpath_root }}/requests"
+path_ca_cert: "{{ ca_fullpath_root }}/root.pem"
