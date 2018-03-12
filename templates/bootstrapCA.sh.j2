@@ -1,0 +1,8 @@
+#!/bin/bash
+CA_ROOT={{ ca_fullpath_root | replace("//", "/") }}
+[[ -d "$CA_ROOT/serial" ]] && (echo "CA already has a serial number file.. bailing out"; /bin/false) || echo "Creating new CA ..."
+cd ~/ && mkdir -p "$CA_ROOT/signedcerts" && mkdir -p "$CA_ROOT/private" && cd "$CA_ROOT"
+echo '01' > serial && touch index.txt
+mv ~/ca_config.cnf ~/CA/
+export OPENSSL_CONF=~/CA/ca_config.cnf
+openssl req -x509 -newkey rsa:4096 -out cacert.pem -outform PEM -days 1825
