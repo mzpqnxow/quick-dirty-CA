@@ -1,3 +1,5 @@
 pep8
 pyflakes
 pylint
+jinja2
+PyYAML
