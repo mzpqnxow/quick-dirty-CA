@@ -1,0 +1,41 @@
+
+# --- Attributes for your Certificate Authority
+ca_short_name: widgetsInc  # This is just for the filesystem
+countryName: US  # Do NOT excepped 2 characters
+localityName: Hoboken
+stateName: NJ  # Do NOT exceed 2 characters
+emailAddress: admin@company.com
+organizationName: Widgets Inc.
+organizationalUnitName: Security Engineering Division
+commonName: Root Certificate Authority
+
+default_rsa_keysize: 4096
+message_digest: sha512
+encrypt_key: no
+base_directory: ~/CA
+ca_short_dirname: "{{ ca_filesystem_prefix }}{{ ca_short_name }}"
+ca_fullpath_root: "{{ base_directory }}/{{ ca_short_dirname }}"
+path_scripts: "{{ ca_fullpath_root }}/bin"
+src_path_issue_cert_script: "{{ CURDIR }}/bin/issue-cert"
+path_issue_cert_script: "{{ path_scripts }}/issue-cert"
+openssl_cnf: "openssl.cnf"
+
+path_serial_file: "{{ ca_fullpath_root }}/serial"
+path_index_file: "{{ ca_fullpath_root }}/index.txt"
+path_private_dir: "{{ ca_fullpath_root }}/private"
+path_signed_certs: "{{ ca_fullpath_root }}/signedcerts"
+path_example_request_file: "{{ ca_fullpath_root }}/examples_request.yml"
+path_templates: "{{ ca_fullpath_root }}/templates"
+src_path_templates: "{{ CURDIR }}/templates"
+src_path_simple_template: "{{src_path_templates }}/issue_simple.cnf"
+path_issue_cert_template_cnf: "{{ path_templates }}/issue_simple.cnf"
+path_ca_cert: "{{ ca_fullpath_root }}/cacert.pem"
+path_etc_dir: "{{ ca_fullpath_root }}/etc"
+
+
+local_openssl_cnf: "{{ tmp_output_path }}/{{ openssl_cnf }}"
+installed_openssl_cnf: "{{ path_etc_dir }}/{{ openssl_cnf }}"
+
+
+# --- Don't change these either
+path_requested: "{{ ca_fullpath_root }}/requested"
