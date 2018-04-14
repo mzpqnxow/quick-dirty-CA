@@ -1,0 +1,369 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+    Copyright 2018 copyright@mzpqnxow.com
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice, this
+       list of conditions and the following disclaimer.
+
+    2. Redistributions in binary form must reproduce the above copyright notice, this
+       list of conditions and the following disclaimer in the documentation and/or other
+       materials provided with the distribution.
+
+    3. Neither the name of the copyright holder nor the names of its contributors may be
+       used to endorse or promote products derived from this software without specific
+       prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+    EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+    OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+    SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+    TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+    BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+    CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+    What this snippet contains:
+
+    - An OrederedDict YaML loader, for preserving order of YaML files
+    - A nested/two-pass Jinja2 templating function working on any type of object
+
+    Very useful in configuration files written in YaML that require re-use of values which
+    is better solved using variables within the YaML. The `nested_template` function permits
+    the following transformation, as an example:
+"""
+from __future__ import print_function
+from argparse import ArgumentParser
+from collections import OrderedDict
+from contextlib import contextmanager
+from datetime import datetime
+from errno import ENOENT
+from logging import (
+    basicConfig as configure_log_basic,
+    getLogger as get_logger,
+    DEBUG as LOGLEVEL_DEBUG,
+    INFO as LOGLEVEL_INFO,
+    WARN as LOGLEVEL_WARN,
+    ERROR as LOGLEVEL_ERROR,
+    CRITICAL as LOGLEVEL_CRITICAL)
+from os import (
+    mkdir,
+    environ,
+    chdir,
+    access,
+    X_OK,
+    getcwd,
+    chmod)
+from os.path import (
+    dirname,
+    expanduser,
+    expandvars,
+    abspath,
+    isfile,
+    isdir,
+    join as join_path,
+    pathsep,
+    sep as DIRSEP)
+from re import search as regex_search
+from shutil import copyfile
+from subprocess import check_call
+
+
+from jinja2 import Template, Environment
+from yaml import load as load_yaml_plain
+
+configure_log_basic()
+LOG = get_logger(__name__)
+LOG.setLevel(LOGLEVEL_DEBUG)
+INFO = LOG.info
+CRIT = LOG.critical
+WARN = LOG.warn
+DEBUG = LOG.debug
+ERROR = LOG.error
+FATAL = LOG.fatal
+
+# Capture our current directory
+CURDIR = dirname(abspath(__file__))
+
+
+def load_yaml(infile, self_template=False):
+    """Load a YaML file with some special requirements"""
+    def load_yaml_ordered(filename):
+        """Load a YaML file as an OrderedDict
+
+        Inspired by StackOverflow
+
+        This function loads a YaML file, preserving order. It also
+        detects duplicates of keys
+        """
+        with open(filename, 'r') as filefd:
+            lines = filefd.read().splitlines()
+            top_keys = []
+            duped_keys = []
+            for line in lines:
+                match = regex_search(r'^([A-Za-z0-9_]+) *:', line)
+                if match:
+                    if match.group(1) in top_keys:
+                        duped_keys.append(match.group(1))
+                    else:
+                        top_keys.append(match.group(1))
+            if duped_keys:
+                raise RuntimeError('ERROR: duplicate keys: {}'.format(duped_keys))
+        with open(filename, 'r') as filefd:
+            print(filefd)
+            d_tmp = load_yaml_plain(filefd)
+        return OrderedDict([(key, d_tmp[key]) for key in top_keys])
+
+    def nested_template(data, template_vars):
+        """data is an arbitrary data structure, template_vars is a dict
+
+        The `data` object is traversed and each instance of a Jinja2 variable
+        that is found in template_vars is replaced (templated)
+
+        This is a recursive function with the end-case being when the object is
+        a simple string or unicode string type
+        """
+
+        if isinstance(data, (str, unicode)):
+            tmpl = Template(data)
+            data = tmpl.render(template_vars)
+            return expandvars(expanduser(data))
+        elif isinstance(data, dict):
+            for key, value in data.iteritems():
+                data[key] = nested_template(value, template_vars)
+            return data
+        elif isinstance(data, list):
+            # Not supporting sets and tuples since YaML doesn't support them
+            tmp_list = []
+            data.reverse()
+            while data:
+                item = data.pop()
+                item = nested_template(item, template_vars)
+                tmp_list.append(item)
+            return tmp_list
+        elif isinstance(data, (int, float)):
+            return data
+        raise RuntimeError('unexpected and unsupported type "{}" encountered'.format(
+            type(data)))
+    # Load configuration/templates
+    data = load_yaml_ordered(infile)
+    if self_template is True:
+        template_input_vars = data
+        data = nested_template(data, template_input_vars)
+    return data
+
+
+def file_write(src, dst, content=None, fail_on_exist=True, create_path=False):
+    """Return None on failure, raise exception on failure by default
+
+       If `src` is None, touch the file `dst`
+       If `src` is None and content is not None, seed it with the contents of `data`
+    """
+    if fail_on_exist is True and dst and (isfile(dst) or isdir(dst)):
+        raise RuntimeError('file already exists, please manually clean out the CA directory !!')
+    if create_path is True:
+        mkdir_parents(dirname(dst))
+    try:
+        if src is None:
+            with open(dst, 'w') as writefd:
+                if content is not None:
+                    writefd.write(content)
+        else:
+            copyfile(src, dst)
+    except IOError:
+        raise
+    return dst
+
+
+@contextmanager
+def pushd(directory):
+    """ Emulate Bash pushd/popd """
+    cwd = getcwd()
+    try:
+        chdir(directory)
+    except OSError as err:
+        if err.errno == ENOENT:
+            raise RuntimeError('%s does not exist !!' % directory)
+        else:
+            raise err
+    yield
+    chdir(cwd)
+
+
+def mkdir_parents(dirpath, fail_on_exist=False, mode=None):
+    """emulate mkdir -p behavior"""
+    if fail_on_exist is True:
+        if isdir(dirpath) or isfile(dirpath):
+            raise RuntimeError('path already exists, please manually clean out the CA directory !!')
+    path_stack = ''
+    for element in dirpath.split(DIRSEP):
+        if not isdir(dirpath):
+            if not element:
+                continue
+            path_stack = join_path(DIRSEP, path_stack, element)
+            if not isdir(path_stack):
+                mkdir(path_stack)
+    if mode is not None:
+        chmod(dirpath, mode)
+
+
+def produce_openssl_cnf(ca_config, request_config):
+    """Build openssl.cnf from a Jinja2 template"""
+    def _get(dn, ca_config, key):
+        return dn.get(key, ca_config[key])
+    # No alternative DNS or IP names by default Jinja2 handles this case fine
+    # by not producing the extension section
+    dns_list = list()
+    ip4_list = list()
+    issue_template = ca_config.get('path_issue_cert_template_cnf', None)
+    path_requested = ca_config['path_requested']
+
+    if issue_template is None:
+        raise RuntimeError(
+            'CA configuration file contains no openssl.cnf template for issuance, exiting ...')
+
+    dn = request_config.get('dn', None)
+    if dn is None:
+        raise RuntimeError(
+            'No `dn` section in configuration, exiting ...')
+
+    # A new request must always have a CN, it can not be inherited from
+    # the Certificate Authority config file like the other fields can
+    cn = dn.get('commonName', None)
+    if cn is None:
+        raise RuntimeError(
+            'cn is a mandatory field, exiting ...')
+
+    name = request_config.get('name', 'request')
+    unique_name = '{}.{}'.format(name, datetime.now().strftime('%Y-%m-%d.%s'))
+    openssl_cnf_outpath = join_path(path_requested, unique_name)
+
+
+    # All of the following values will be inherited by the Certificate
+    # Authority configuration if they are left blank in the request file
+    #
+    # In practice this is pretty reasonable behavior for an `internal` or
+    # `private` Certificate Authority, which is what this is designed for
+    state = _get(dn, ca_config, 'stateName')
+    country = _get(dn, ca_config, 'countryName')
+    locality = _get(dn, ca_config, 'localityName')
+    email = _get(dn, ca_config, 'emailAddress')
+    org = _get(dn, ca_config, 'organizationName')
+    ou = _get(dn, ca_config, 'organizationalUnitName')
+
+    if filter(lambda value: len(value) != 2, (state, country)):
+        raise RuntimeError(
+            'State and Country fields must be 2 characters, no more or less, exiting ...')
+
+    # If there is an alt_names section, prepare to build a configuration
+    # with subjectAlternativeNames by populating the template data for
+    # Jinja2
+    alt_names = request_config.get('alt_names', None)
+    if alt_names is not None:
+        ip4_list = alt_names.get('ip', [])
+        dns_list = alt_names.get('dns', [])
+
+    template_filler_data = {
+        'ip4_list': ip4_list,
+        'dns_list': dns_list,
+        'cn': cn,
+        'state': state,
+        'country': country,
+        'locality': locality,
+        'email': email,
+        'org': org,
+        'ou': ou}
+
+    template_content = open(issue_template, 'r').read()
+    openssl_cnf_content = Environment().from_string(template_content).render(template_filler_data)
+    print(openssl_cnf_content)
+    mkdir_parents(openssl_cnf_outpath)
+    file_write(None, join_path(openssl_cnf_outpath, 'openssl.cnf'), content=openssl_cnf_content)
+    return openssl_cnf_outpath
+
+
+def which(program):
+    """Emulate the UNIX `which` command, trusting the user's environment"""
+    def is_exe(fpath):
+        """check if a file is executable for the current user"""
+        return isfile(fpath) and access(fpath, X_OK)
+    if DIRSEP in program:
+        if is_exe(program):
+            return program
+    else:
+        for search_path in environ['PATH'].split(pathsep):
+            search_path = search_path.strip('"')
+            exe_file = join_path(search_path, program)
+            if is_exe(exe_file):
+                return exe_file
+    return None
+
+
+def generate_certificate(working_path):
+    """Execute the command to generate the (unsigned) certificate"""
+    with pushd(working_path):
+        environ['OPENSSL_CONF'] = join_path(working_path, 'openssl.cnf')
+        DEBUG('Using OPENSSL_CONF={}'.format(join_path(working_path, 'openssl.cnf')))
+        openssl_cmd = which('openssl')
+        if openssl_cmd is None:
+            raise RuntimeError('openssl command-line is not in your $PATH !!')
+        cmdline = [
+            which('openssl'),
+            'req',
+            '-newkey',
+            'rsa:4096',
+            '-keyout',
+            'tempkey.pem',
+            '-keyform',
+            'PEM',
+            '-out',
+            'tempreq.pem',
+            '-outform',
+            'PEM']
+        DEBUG('SHELL: {}'.format(' '.join(cmdline)))
+        check_call(cmdline)
+
+
+def sign_certificate(openssl_config_path, openssl_cnf):
+    """Execute the command to sign the certificate with the Certificate Authority"""
+    with pushd(openssl_config_path):
+        environ['OPENSSL_CONF'] = openssl_cnf
+        openssl_cmd = which('openssl')
+        if openssl_cmd is None:
+            raise RuntimeError('openssl command-line is not in your $PATH !!')
+        cmdline = [
+            which('openssl'),
+            'ca',
+            '-in',
+            'tempreq.pem',
+            '-out',
+            'server_crt.pem',
+            '-batch']
+        DEBUG('SHELL: {}'.format(' '.join(cmdline)))
+        check_call(cmdline)
+
+
+def main():
+    """Entrypoint"""
+    parser = ArgumentParser(description='Certificate Issuer Script')
+    parser.add_argument(
+        '-i', '--input-request-file',
+        help='Path to YaML configuration file with certificate information',
+        required=True,
+        dest='request_filepath',
+        metavar='<server1.yml>')
+    args = parser.parse_args()
+    ca_config = load_yaml(join_path(CURDIR, '..', 'etc', 'ca.yml'))
+    request_config = load_yaml(args.request_filepath, self_template=True)
+    openssl_config = produce_openssl_cnf(ca_config, request_config)
+    ca_openssl_cnf = ca_config['installed_openssl_cnf']
+    generate_certificate(openssl_config)
+    sign_certificate(openssl_config, ca_openssl_cnf)
+
+if __name__ == '__main__':
+    main()
