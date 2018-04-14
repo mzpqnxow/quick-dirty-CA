@@ -1,0 +1,26 @@
+[ req ]
+prompt = no
+distinguished_name = server_distinguished_name
+encrypt_key = no
+
+req_extensions = v3_req
+
+[ server_distinguished_name ]
+commonName = {{ cn }}
+stateOrProvinceName = {{ state }}
+localityName = {{ locality }}
+countryName = {{ country }}
+emailAddress = {{ email }}
+organizationName = {{ org }}
+organizationalUnitName = {{ ou }}
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+{% if dns_list|length > 0 or ip4_list|length > 0 %}subjectAltName = @alt_names{% endif %}
+
+{% if dns_list|length > 0 or ip4_list|length > 0 %}[ alt_names ]{% endif %}
+{% for dns_name in dns_list %}DNS.{{loop.index}} = {{ dns_name }}
+{% endfor %}{% for ip4_addr in ip4_list %}IP.{{loop.index}} = {{ ip4_addr }}
+{% endfor %}
+
