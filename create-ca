@@ -320,6 +320,8 @@ def build_ca_filesystem(params, args):
         content='01\n',
         fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt'), fail_on_exist=True)
+    file_write(None, _fs(root, 'index.txt.attr'), fail_on_exist=True)
+
     yaml_file = join_path(
         params['path_etc_dir'],
         basename(args.yaml_filepath))
