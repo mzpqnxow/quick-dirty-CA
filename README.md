@@ -38,6 +38,25 @@ First you should switch into the new CA directory. Modify the examples_request.y
 
 ```
 $ bin/issue-cert -i examples_request.yml
+...
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'hostname.private'
+stateOrProvinceName   :ASN.1 12:'NJ'
+localityName          :ASN.1 12:'Hoboken'
+countryName           :PRINTABLE:'US'
+emailAddress          :IA5STRING:'root@domain.com'
+organizationName      :ASN.1 12:'WidgetsInc'
+organizationalUnitName:ASN.1 12:'Round Widgets Division'
+Certificate is to be certified until Apr 13 02:58:36 2023 GMT (1825 days)
+
+Write out database with 1 new entries
+Data Base Updated
+Certificate and private key have been generated and signed by CA !!
+  Key:         /home/debian/CA/widgetsInc/requested/request.2018-04-13.1523674715/server.key
+  Certificate: /home/debian/CA/widgetsInc/requested/request.2018-04-13.1523674715/server.crt
+  Combined:    /home/debian/CA/widgetsInc/requested/request.2018-04-13.1523674715/server.pem
 $ ls -l requested/
 ```
 
