@@ -346,6 +346,16 @@ def sign_certificate(openssl_config_path, openssl_cnf):
         check_call(cmdline)
 
 
+def postprocess(output_path):
+    with pushd(output_path):
+        from os import rename, unlink
+        rename('tempkey.pem', 'server.key')
+        rename('server_crt.pem', 'server.crt')
+        certificate_pem = open('server.crt').read()
+        key_pem = open('server.key').read()
+        open('server.pem', 'wb').write('\n'.join((certificate_pem, key_pem)))
+        unlink('tempreq.pem')
+
 def main():
     """Entrypoint"""
     parser = ArgumentParser(description='Certificate Issuer Script')
@@ -362,6 +372,12 @@ def main():
     ca_openssl_cnf = ca_config['installed_openssl_cnf']
     generate_certificate(openssl_config)
     sign_certificate(openssl_config, ca_openssl_cnf)
+    postprocess(openssl_config)
+    print('Certificate and private key have been generated and signed by CA !!')
+    print('  Key:         {}/{}'.format(openssl_config, 'server.key'))
+    print('  Certificate: {}/{}'.format(openssl_config, 'server.crt'))
+    print('  Combined:    {}/{}'.format(openssl_config, 'server.pem'))
+    print('')
 
 if __name__ == '__main__':
     main()
