@@ -77,7 +77,7 @@ The CA certificate is located in the root of the CA named `cacert.pem` and is ha
 
 ### Final notes
 
-I am aware there are many, many, many, many, many CA automation applications, scripts and frameworks in the open-source world. However I had a hard time fitting the exact requirements I had- extremely simple and allowing for easy addition of subject alternative names. I would be really happy to hear about what could replace this as I admit the code is a mess and the overall design is poor by usual standards. Please create an issue with a link to a similar (but better) tool if you have the time! This was only a day's worth of work for me so I won't hesitate to drop it and use someone else's more well thought out tool instead!
+I am aware there are many, many, many, many, many CA automation applications, scripts and frameworks in the open-source world. However I had a hard time fitting the exact requirements I had- extremely simple and allowing for easy addition of subject alternative names. I would be really happy to hear about what could replace this as I admit the code is a mess and the overall design is poor by my usual standards. Please create an issue with a link to a similar (but better) tool if you have the time! This was only a day's worth of work for me so I won't hesitate to drop it and use someone else's more well thought out tool instead!
 
 ### License / Copyright
 
