@@ -115,7 +115,6 @@ def load_yaml(infile, self_template=False):
             if duped_keys:
                 raise RuntimeError('ERROR: duplicate keys: {}'.format(duped_keys))
         with open(filename, 'r') as filefd:
-            print(filefd)
             d_tmp = load_yaml_plain(filefd)
         return OrderedDict([(key, d_tmp[key]) for key in top_keys])
 
@@ -281,7 +280,6 @@ def produce_openssl_cnf(ca_config, request_config):
 
     template_content = open(issue_template, 'r').read()
     openssl_cnf_content = Environment().from_string(template_content).render(template_filler_data)
-    print(openssl_cnf_content)
     mkdir_parents(openssl_cnf_outpath)
     file_write(None, join_path(openssl_cnf_outpath, 'openssl.cnf'), content=openssl_cnf_content)
     return openssl_cnf_outpath
