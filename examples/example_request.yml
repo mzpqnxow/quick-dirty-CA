@@ -17,16 +17,17 @@
 #
 ---
 dn:
-  cn: hostname.private
-  state: NY
-  country: US
-  email: root@domain.com
-  org: WidgetsInc
-  ou: Round Widgets Division
+  commonName: hostname.private
+  stateName: NJ
+  localityName: Hoboken
+  countryName: US
+  emailAddress: root@domain.com
+  organizationName: WidgetsInc
+  organizationalUnitName: Round Widgets Division
 
 alt_names:
-  IP:
+  ip:
     - 1.2.3.4
-  DNS:
+  dns:
     - hostname
     - hostname.private
