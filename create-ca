@@ -53,7 +53,6 @@ from logging import (
 from os import (
     environ,
     chdir,
-    strerror,
     access,
     X_OK,
     chmod,
@@ -148,10 +147,12 @@ def file_write(src, dst, content=None, fail_on_exist=True, create_path=False, mo
     """Return None on failure, raise exception on failure by default
 
        If `src` is None, touch the file `dst`
-       If `src` is None and content is not None, seed it with the contents of `data`
+       If `src` is None and content is not None, seed it with the contents
+       of `data`
     """
     if fail_on_exist is True and dst and (isfile(dst) or isdir(dst)):
-        raise RuntimeError('file already exists, please manually clean out the CA directory !!')
+        raise RuntimeError(
+            'file already exists, please clean out the CA directory !!')
     if create_path is True:
         mkdir_parents(dirname(dst))
     try:
@@ -175,7 +176,8 @@ def mkdir_parents(dirpath, fail_on_exist=False, mode=None):
     """emulate mkdir -p behavior"""
     if fail_on_exist is True:
         if isdir(dirpath) or isfile(dirpath):
-            raise RuntimeError('path already exists, please manually clean out the CA directory !!')
+            raise RuntimeError(
+                'path exists, remove or rethink your actions!!')
     path_stack = ''
     for element in dirpath.split(DIRSEP):
         if not isdir(dirpath):
@@ -217,7 +219,8 @@ def nested_template(data, template_vars):
         return tmp_list
     elif isinstance(data, (int, float)):
         return data
-    raise RuntimeError('unexpected and unsupported type "{}" encountered'.format(
+    raise RuntimeError(
+        'unexpected and unsupported type "{}" encountered'.format(
         type(data)))
 
 
@@ -248,9 +251,9 @@ def load_yaml_ordered(filename):
 
 
 def save_params_to_ca_root(params, yaml_file):
-    """Write a YaML file to the CA structure for reference within the CA root"""
+    """Write a YaML file to the CA root for use when issuing certs"""
     def strip_double_slashes(obj):
-        """Givent a dict, recursively eliminate double slashes from all string values"""
+        """Recursively clean up paths in a dict"""
         if isinstance(obj, (str, unicode)):
             return obj.replace('//', '/')
 
@@ -267,7 +270,10 @@ def save_params_to_ca_root(params, yaml_file):
         return obj
     params = strip_double_slashes(params)
     yaml_file = strip_extension(yaml_file)[0]
-    dump_yaml_plain(params, open(yaml_file, 'wb'), default_flow_style=False)
+    dump_yaml_plain(
+        params,
+        open(yaml_file, 'wb'),
+        default_flow_style=False)
 
 
 def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
@@ -275,7 +281,8 @@ def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
     DEBUG('Using OPENSSL_CONF={}'.format(openssl_cnf_dst))
     openssl_cmd = which('openssl')
     if openssl_cmd is None:
-        raise RuntimeError('openssl command-line is not in your $PATH !!')
+        raise RuntimeError(
+            'openssl command-line is not in your $PATH !!')
     DEBUG('Sending out to {}'.format(path_ca_pem))
     cmdline = [
         openssl_cmd,
@@ -290,7 +297,11 @@ def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
         '-days',
         '36500']
     DEBUG('SHELL: {}'.format(' '.join(cmdline)))
-    check_call(cmdline, stdout=open('/dev/null', 'wb'), stderr=open('/dev/null', 'wb'))
+    check_call(
+        cmdline,
+        stdout=open('/dev/null', 'wb'),
+        stderr=open('/dev/null', 'wb'))
+
 
 def build_ca_filesystem(params, args):
     """Build the filesystem layout for a new CA"""
@@ -302,9 +313,16 @@ def build_ca_filesystem(params, args):
     mkdir_parents(_fs(root, 'etc'), mode=0700)
     mkdir_parents(_fs(root, 'private'), mode=0700)
     mkdir_parents(_fs(root, 'signedcerts'), mode=0700)
-    file_write(None, _fs(root, 'serial'), content='01\n', fail_on_exist=True)
+    file_write(
+        None,
+        _fs(root,
+            'serial'),
+        content='01\n',
+        fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt'), fail_on_exist=True)
-    yaml_file = join_path(params['path_etc_dir'], basename(args.yaml_filepath))
+    yaml_file = join_path(
+        params['path_etc_dir'],
+        basename(args.yaml_filepath))
     save_params_to_ca_root(params, yaml_file)
     file_write(
         join_path(CURDIR, 'examples', 'example_request.yml'),
@@ -327,8 +345,10 @@ def get_cnf(args):
     data['CURDIR'] = CURDIR
     template_input_vars = data
     resolved = nested_template(data, template_input_vars)
-    j2_env = Environment(loader=FileSystemLoader(CURDIR), trim_blocks=True)
-    openssl_cnf_content = j2_env.get_template(args.template_filepath).render(resolved)
+    j2_env = Environment(
+        loader=FileSystemLoader(CURDIR), trim_blocks=True)
+    openssl_cnf_content = j2_env.get_template(
+        args.template_filepath).render(resolved)
     return openssl_cnf_content, resolved
 
 
@@ -341,6 +361,7 @@ def openssl_cnf(args):
         fail_on_exist=False,
         create_path=True)
     return resolved
+
 
 def main():
     """Entrypoint"""
