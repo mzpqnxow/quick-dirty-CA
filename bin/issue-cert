@@ -388,7 +388,7 @@ def main():
     parser = ArgumentParser(description='Certificate Issuer Script')
     parser.add_argument(
         '-i', '--input-request-file',
-        help='Path to YaML configuration file with certificate information',
+        help='Path to YaML configuration file with certificate information (see example_request.yml)',
         required=True,
         dest='request_filepath',
         metavar='<server1.yml>')
