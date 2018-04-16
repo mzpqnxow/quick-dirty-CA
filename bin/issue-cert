@@ -317,6 +317,7 @@ def generate_certificate(working_path):
         cmdline = [
             which('openssl'),
             'req',
+            '-batch',
             '-newkey',
             'rsa:4096',
             '-keyout',
@@ -341,6 +342,7 @@ def sign_certificate(openssl_config_path, openssl_cnf):
         cmdline = [
             which('openssl'),
             'ca',
+            '-batch',
             '-in',
             'tempreq.pem',
             '-out',
