@@ -308,12 +308,16 @@ def build_ca_filesystem(params, args):
         return join_path(ca_root, filename)
 
     root = params['ca_fullpath_root']
+    # Mark the root 700, but still be paranoid with the other
+    # private directories just in case the user is dumber than
+    # usual
     mkdir_parents(params['ca_fullpath_root'], mode=0700)
     mkdir_parents(_fs(root, 'etc'), mode=0700)
     mkdir_parents(_fs(root, 'private'), mode=0700)
     mkdir_parents(_fs(root, 'signedcerts'), mode=0700)
     mkdir_parents(_fs(root, 'requests'))
     mkdir_parents(_fs(root, 'crl'))
+    mkdir_parents(_fs(root, 'certs'))
     file_write(
         None,
         _fs(root,
