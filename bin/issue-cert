@@ -58,7 +58,9 @@ from os import (
     access,
     X_OK,
     getcwd,
-    chmod)
+    chmod,
+    rename,
+    unlink)
 from os.path import (
     dirname,
     expanduser,
@@ -89,6 +91,10 @@ FATAL = LOG.fatal
 
 # Capture our current directory
 CURDIR = dirname(abspath(__file__))
+
+# This is a requirement for PFX, it is not a security measure
+# Transfer the file securely and delete once imported please
+PFX_PASSWORD = 'password'
 
 
 def load_yaml(infile, self_template=False):
@@ -241,8 +247,6 @@ def produce_openssl_cnf(ca_config, request_config):
     name = request_config.get('name', 'request')
     unique_name = '{}.{}'.format(name, datetime.now().strftime('%Y-%m-%d.%s'))
     openssl_cnf_outpath = join_path(path_requested, unique_name)
-
-
     # All of the following values will be inherited by the Certificate
     # Authority configuration if they are left blank in the request file
     #
@@ -346,15 +350,38 @@ def sign_certificate(openssl_config_path, openssl_cnf):
         check_call(cmdline)
 
 
-def postprocess(output_path):
+def postprocess(output_path, cacert_filepath):
+    def make_pfx():
+        openssl_cmd = which('openssl')
+        if openssl_cmd is None:
+            raise RuntimeError('openssl command-line is not in your $PATH !!')
+        cmdline = [
+            which('openssl'),
+            'pkcs12',
+            '-export',
+            '-passin',
+            'pass:{}'.format(PFX_PASSWORD),
+            '-passout',
+            'pass:{}'.format(PFX_PASSWORD),
+            '-out',
+            'server.pfx',
+            '-inkey',
+            'server.key',
+            '-in',
+            'server.crt',
+            '-certfile',
+            cacert_filepath]
+        DEBUG('SHELL: {}'.format(' '.join(cmdline)))
+        check_call(cmdline)
     with pushd(output_path):
-        from os import rename, unlink
         rename('tempkey.pem', 'server.key')
         rename('server_crt.pem', 'server.crt')
         certificate_pem = open('server.crt').read()
         key_pem = open('server.key').read()
         open('server.pem', 'wb').write('\n'.join((certificate_pem, key_pem)))
         unlink('tempreq.pem')
+        make_pfx()
+
 
 def main():
     """Entrypoint"""
@@ -367,17 +394,20 @@ def main():
         metavar='<server1.yml>')
     args = parser.parse_args()
     ca_config = load_yaml(join_path(CURDIR, '..', 'etc', 'ca.yml'))
+    cacert_filepath = ca_config['path_ca_cert']
     request_config = load_yaml(args.request_filepath, self_template=True)
     openssl_config = produce_openssl_cnf(ca_config, request_config)
     ca_openssl_cnf = ca_config['installed_openssl_cnf']
     generate_certificate(openssl_config)
     sign_certificate(openssl_config, ca_openssl_cnf)
-    postprocess(openssl_config)
+    postprocess(openssl_config, cacert_filepath)
     print('Certificate and private key have been generated and signed by CA !!')
     print('  Key:         {}/{}'.format(openssl_config, 'server.key'))
     print('  Certificate: {}/{}'.format(openssl_config, 'server.crt'))
     print('  Combined:    {}/{}'.format(openssl_config, 'server.pem'))
+    print('  PKCS11/PFX:  {}/{}'.format(openssl_config, 'server.pfx'))
     print('')
+
 
 if __name__ == '__main__':
     main()
