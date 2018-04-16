@@ -220,8 +220,7 @@ def nested_template(data, template_vars):
     elif isinstance(data, (int, float)):
         return data
     raise RuntimeError(
-        'unexpected and unsupported type "{}" encountered'.format(
-        type(data)))
+        'unexpected and unsupported type "{}" encountered'.format(type(data)))
 
 
 def load_yaml_ordered(filename):
@@ -313,6 +312,7 @@ def build_ca_filesystem(params, args):
     mkdir_parents(_fs(root, 'etc'), mode=0700)
     mkdir_parents(_fs(root, 'private'), mode=0700)
     mkdir_parents(_fs(root, 'signedcerts'), mode=0700)
+    mkdir_parents(_fs(root, 'requests'))
     file_write(
         None,
         _fs(root,
