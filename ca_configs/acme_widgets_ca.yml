@@ -1,13 +1,13 @@
 
 # --- Attributes for your Certificate Authority
-ca_short_name: widgetsInc  # This is just for the filesystem
+ca_short_name: AcmeCA  # This is just for the filesystem
 countryName: US  # Do NOT excepped 2 characters
 localityName: Hoboken
 stateName: NJ  # Do NOT exceed 2 characters
 emailAddress: admin@company.com
-organizationName: Widgets Inc.
+organizationName: Acme Widgets Inc.
 organizationalUnitName: Security Engineering Division
-commonName: Root Certificate Authority
+commonName: Internal Root Certificate Authority
 
 default_rsa_keysize: 4096
 message_digest: sha512
