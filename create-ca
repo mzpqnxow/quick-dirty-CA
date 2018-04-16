@@ -313,6 +313,7 @@ def build_ca_filesystem(params, args):
     mkdir_parents(_fs(root, 'private'), mode=0700)
     mkdir_parents(_fs(root, 'signedcerts'), mode=0700)
     mkdir_parents(_fs(root, 'requests'))
+    mkdir_parents(_fs(root, 'crl'))
     file_write(
         None,
         _fs(root,
