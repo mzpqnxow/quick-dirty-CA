@@ -12,9 +12,11 @@ unique_subject = 	no
 certificate = 		$dir/cacert.pem
 private_key = 		$dir/private/cakey.pem
 database = 			$dir/index.txt
+certs =				$dir/certs 
 new_certs_dir = 	$dir/signedcerts
 serial = 			$dir/serial
 # RANDFILE = 		$dir/private/.rand
+RANDFILE = 			$dir/private/.rand
 default_days = 		1825
 default_md = 		{{ message_digest }}
 policy = 			CA_default_policy
@@ -67,6 +69,8 @@ localityName = 				{{ localityName }}
 
 [ v3_ca ]
 subjectKeyIdentifier = 		hash
-authorityKeyIdentifier = 	keyid:always,issuer
-basicConstraints = 			critical, CA:true
+# authorityKeyIdentifier = 	keyid:always,issuer
+authorityKeyIdentifier =	keyid:always,issuer:always
+# basicConstraints = 		critical, CA:true
+basicConstraints =			CA:TRUE
 keyUsage = 					critical, digitalSignature, cRLSign, keyCertSign
