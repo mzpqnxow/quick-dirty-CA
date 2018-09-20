@@ -57,7 +57,8 @@ from os import (
     X_OK,
     chmod,
     mkdir,
-    getcwd)
+    getcwd,
+    symlink as ln)
 from os.path import (
     abspath,
     basename,
@@ -105,7 +106,7 @@ VALID_REQUEST_NAME_CHARSET = ascii_letters + digits + '-_.'
 CURDIR = dirname(abspath(__file__))
 
 TEMPLATES = 'templates'
-CONF = 'conf'
+CONF = 'ca_configs'
 
 DEFAULT_YAML_CONFIG_PATH = join_path(CONF, 'ca.yml.j2')
 DEFAULT_TEMPLATE_PATH = join_path(TEMPLATES, 'openssl.cnf.j2')
@@ -151,8 +152,8 @@ def file_write(src, dst, content=None, fail_on_exist=True, create_path=False, mo
        of `data`
     """
     if fail_on_exist is True and dst and (isfile(dst) or isdir(dst)):
-        raise RuntimeError(
-            'file already exists, please clean out the CA directory !!')
+        ERROR('file "{}" already exists, are you doing something by mistake?'.format(dst))
+        exit(1)
     if create_path is True:
         mkdir_parents(dirname(dst))
     try:
@@ -220,8 +221,7 @@ def nested_template(data, template_vars):
     elif isinstance(data, (int, float)):
         return data
     raise RuntimeError(
-        'unexpected and unsupported type "{}" encountered'.format(
-        type(data)))
+        'unexpected and unsupported type "{}" encountered'.format(type(data)))
 
 
 def load_yaml_ordered(filename):
@@ -269,11 +269,13 @@ def save_params_to_ca_root(params, yaml_file):
             return obj
         return obj
     params = strip_double_slashes(params)
-    yaml_file = strip_extension(yaml_file)[0]
+    # yaml_file = strip_extension(yaml_file)[0]
     dump_yaml_plain(
         params,
         open(yaml_file, 'wb'),
         default_flow_style=False)
+    with pushd(dirname(yaml_file)):
+        ln(basename(yaml_file), 'ca.yml')
 
 
 def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
@@ -287,6 +289,7 @@ def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
     cmdline = [
         openssl_cmd,
         'req',
+        '-batch',
         '-x509',
         '-newkey',
         'rsa:4096',
@@ -309,10 +312,16 @@ def build_ca_filesystem(params, args):
         return join_path(ca_root, filename)
 
     root = params['ca_fullpath_root']
+    # Mark the root 700, but still be paranoid with the other
+    # private directories just in case the user is dumber than
+    # usual
     mkdir_parents(params['ca_fullpath_root'], mode=0700)
     mkdir_parents(_fs(root, 'etc'), mode=0700)
     mkdir_parents(_fs(root, 'private'), mode=0700)
     mkdir_parents(_fs(root, 'signedcerts'), mode=0700)
+    mkdir_parents(_fs(root, 'requests'))
+    mkdir_parents(_fs(root, 'crl'))
+    mkdir_parents(_fs(root, 'certs'))
     file_write(
         None,
         _fs(root,
@@ -325,6 +334,7 @@ def build_ca_filesystem(params, args):
     yaml_file = join_path(
         params['path_etc_dir'],
         basename(args.yaml_filepath))
+
     save_params_to_ca_root(params, yaml_file)
     file_write(
         join_path(CURDIR, 'examples', 'example_request.yml'),
@@ -376,14 +386,14 @@ def main():
             help='Name of template in template/ directory',
             required=False,
             dest='template_filepath',
-            metavar='<templates/openssl.cnf.j2')
+            metavar='templates/openssl.cnf.j2')
         parser.add_argument(
             '-y', '--yaml-config',
             default=DEFAULT_YAML_CONFIG_PATH,
-            help='Name of YaML configuration file in config/ directory',
-            required=False,
+            help='CA configuration file in config/ directory, specific to your CA',
+            required=True,
             dest='yaml_filepath',
-            metavar='<etc/config.yml>')
+            metavar='ca_configs/acme_widgets_ca.yml')
         return parser.parse_args()
 
     def init_yaml():
@@ -410,6 +420,7 @@ def main():
         path_ca_pem,
         installed_openssl_cnf)
     INFO('Created new Certificate Authority @ {}'.format(path_ca_pem))
+
 
 if __name__ == '__main__':
     main()

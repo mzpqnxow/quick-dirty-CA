@@ -58,7 +58,9 @@ from os import (
     access,
     X_OK,
     getcwd,
-    chmod)
+    chmod,
+    rename,
+    unlink)
 from os.path import (
     dirname,
     expanduser,
@@ -89,6 +91,11 @@ FATAL = LOG.fatal
 
 # Capture our current directory
 CURDIR = dirname(abspath(__file__))
+
+# This is a requirement for PFX, it is not a security measure
+# Transfer the file securely and delete once imported please
+PFX_PASSWORD = 'password'
+DEFAULT_KEYSIZE = 4096
 
 
 def load_yaml(infile, self_template=False):
@@ -238,11 +245,10 @@ def produce_openssl_cnf(ca_config, request_config):
         raise RuntimeError(
             'cn is a mandatory field, exiting ...')
 
-    name = request_config.get('name', 'request')
+    # name = request_config.get('name', 'request')
+    name = cn
     unique_name = '{}.{}'.format(name, datetime.now().strftime('%Y-%m-%d.%s'))
     openssl_cnf_outpath = join_path(path_requested, unique_name)
-
-
     # All of the following values will be inherited by the Certificate
     # Authority configuration if they are left blank in the request file
     #
@@ -282,7 +288,7 @@ def produce_openssl_cnf(ca_config, request_config):
     openssl_cnf_content = Environment().from_string(template_content).render(template_filler_data)
     mkdir_parents(openssl_cnf_outpath)
     file_write(None, join_path(openssl_cnf_outpath, 'openssl.cnf'), content=openssl_cnf_content)
-    return openssl_cnf_outpath
+    return openssl_cnf_outpath, cn
 
 
 def which(program):
@@ -302,7 +308,7 @@ def which(program):
     return None
 
 
-def generate_certificate(working_path):
+def generate_certificate(working_path, keysize):
     """Execute the command to generate the (unsigned) certificate"""
     with pushd(working_path):
         environ['OPENSSL_CONF'] = join_path(working_path, 'openssl.cnf')
@@ -313,8 +319,9 @@ def generate_certificate(working_path):
         cmdline = [
             which('openssl'),
             'req',
+            '-batch',
             '-newkey',
-            'rsa:4096',
+            'rsa:{}'.format(keysize),
             '-keyout',
             'tempkey.pem',
             '-keyform',
@@ -337,6 +344,7 @@ def sign_certificate(openssl_config_path, openssl_cnf):
         cmdline = [
             which('openssl'),
             'ca',
+            '-batch',
             '-in',
             'tempreq.pem',
             '-out',
@@ -346,38 +354,66 @@ def sign_certificate(openssl_config_path, openssl_cnf):
         check_call(cmdline)
 
 
-def postprocess(output_path):
+def postprocess(output_path, cacert_filepath, cn):
+    def make_pfx():
+        openssl_cmd = which('openssl')
+        if openssl_cmd is None:
+            raise RuntimeError('openssl command-line is not in your $PATH !!')
+        cmdline = [
+            which('openssl'),
+            'pkcs12',
+            '-export',
+            '-passin',
+            'pass:{}'.format(PFX_PASSWORD),
+            '-passout',
+            'pass:{}'.format(PFX_PASSWORD),
+            '-out',
+            '{}.pfx'.format(cn),
+            '-inkey',
+            '{}.key'.format(cn),
+            '-in',
+            '{}.crt'.format(cn),
+            '-certfile',
+            cacert_filepath]
+        DEBUG('SHELL: {}'.format(' '.join(cmdline)))
+        check_call(cmdline)
     with pushd(output_path):
-        from os import rename, unlink
-        rename('tempkey.pem', 'server.key')
-        rename('server_crt.pem', 'server.crt')
-        certificate_pem = open('server.crt').read()
-        key_pem = open('server.key').read()
-        open('server.pem', 'wb').write('\n'.join((certificate_pem, key_pem)))
+        rename('tempkey.pem', '{}.key'.format(cn))
+        rename('server_crt.pem', '{}.crt'.format(cn))
+        certificate_pem = open('{}.crt'.format(cn)).read()
+        key_pem = open('{}.key'.format(cn)).read()
+        open('{}.pem'.format(cn), 'wb').write('\n'.join((certificate_pem, key_pem)))
         unlink('tempreq.pem')
+        make_pfx()
+
 
 def main():
     """Entrypoint"""
+    global DEFAULT_KEYSIZE
     parser = ArgumentParser(description='Certificate Issuer Script')
     parser.add_argument(
         '-i', '--input-request-file',
-        help='Path to YaML configuration file with certificate information',
+        help='Path to YaML configuration file with certificate information (see example_request.yml)',
         required=True,
         dest='request_filepath',
         metavar='<server1.yml>')
     args = parser.parse_args()
     ca_config = load_yaml(join_path(CURDIR, '..', 'etc', 'ca.yml'))
+    cacert_filepath = ca_config['path_ca_cert']
     request_config = load_yaml(args.request_filepath, self_template=True)
-    openssl_config = produce_openssl_cnf(ca_config, request_config)
+    keysize = request_config.get('keysize', DEFAULT_KEYSIZE)
+    openssl_config, cn = produce_openssl_cnf(ca_config, request_config)
     ca_openssl_cnf = ca_config['installed_openssl_cnf']
-    generate_certificate(openssl_config)
+    generate_certificate(openssl_config, keysize)
     sign_certificate(openssl_config, ca_openssl_cnf)
-    postprocess(openssl_config)
+    postprocess(openssl_config, cacert_filepath, cn)
     print('Certificate and private key have been generated and signed by CA !!')
-    print('  Key:         {}/{}'.format(openssl_config, 'server.key'))
-    print('  Certificate: {}/{}'.format(openssl_config, 'server.crt'))
-    print('  Combined:    {}/{}'.format(openssl_config, 'server.pem'))
+    print('  Key:         {}/{}'.format(openssl_config, '{}.key'.format(cn)))
+    print('  Certificate: {}/{}'.format(openssl_config, '{}.crt'.format(cn)))
+    print('  Combined:    {}/{}'.format(openssl_config, '{}.pem'.format(cn)))
+    print('  PKCS11/PFX:  {}/{}'.format(openssl_config, '{}.pfx'.format(cn)))
     print('')
+
 
 if __name__ == '__main__':
     main()
