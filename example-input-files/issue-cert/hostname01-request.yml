@@ -1,0 +1,34 @@
+#
+# This is a simple example of a certificate request
+# If you leave out any of the `dn` values, defaults
+# will be pulled from the CA configuration file, so
+# beware !!
+#
+# This supports only very basic functionality. You
+# can create a certificate with a simple distinguished
+# name only or you can create a certificate with a
+# subject alternative names section. Subject alterative
+# names go under the `alt_names` section and can be either
+# IP or DNS alternative names
+#
+# From this file, an openssl.cnf file will be produced and
+# processed by the CA, producing a signed certificate and a
+# corresponding private key
+#
+---
+dn:
+  commonName: hostname.private
+  stateName: NJ
+  localityName: Hoboken
+  countryName: US
+  emailAddress: root@domain.com
+  organizationName: WidgetsInc
+  organizationalUnitName: Round Widgets Division
+
+alt_names:
+  ip:
+    - 192.168.1.21
+  dns:
+    - ftp.widgets.com
+    - hostname01.widgets.com
+

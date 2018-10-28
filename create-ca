@@ -42,37 +42,16 @@ import argparse
 from collections import OrderedDict
 from contextlib import contextmanager
 from errno import ENOENT
-from logging import (
-    basicConfig as configure_log_basic,
-    getLogger as get_logger,
-    DEBUG as LOGLEVEL_DEBUG,
-    INFO as LOGLEVEL_INFO,
-    WARN as LOGLEVEL_WARN,
-    ERROR as LOGLEVEL_ERROR,
-    CRITICAL as LOGLEVEL_CRITICAL)
-from os import (
-    environ,
-    chdir,
-    access,
-    X_OK,
-    chmod,
-    mkdir,
-    getcwd,
-    symlink as ln)
-from os.path import (
-    abspath,
-    basename,
-    dirname,
-    expanduser,
-    expandvars,
-    isfile,
-    isdir,
-    join as join_path,
-    pathsep,
-    sep as DIRSEP,
-    splitext as strip_extension)
+from logging import (basicConfig as configure_log_basic, getLogger as
+                     get_logger, DEBUG as LOGLEVEL_DEBUG, INFO as
+                     LOGLEVEL_INFO, WARN as LOGLEVEL_WARN, ERROR as
+                     LOGLEVEL_ERROR, CRITICAL as LOGLEVEL_CRITICAL)
+from os import (environ, chdir, access, X_OK, chmod, mkdir, getcwd, symlink as
+                ln)
+from os.path import (abspath, basename, dirname, expanduser, expandvars,
+                     isfile, isdir, join as join_path, pathsep, sep as DIRSEP)
 from re import search as regex_search
-from shutil import copyfile
+from shutil import copyfile, copytree
 from string import ascii_letters, digits
 from subprocess import check_call
 
@@ -84,10 +63,7 @@ from yaml.representer import SafeRepresenter
 from yaml import load as load_yaml_plain, safe_dump as dump_yaml_plain
 import yaml
 
-from jinja2 import (
-    Template,
-    Environment,
-    FileSystemLoader)
+from jinja2 import (Template, Environment, FileSystemLoader)
 
 configure_log_basic()
 LOG = get_logger(__name__)
@@ -98,7 +74,6 @@ WARN = LOG.warn
 DEBUG = LOG.debug
 ERROR = LOG.error
 FATAL = LOG.fatal
-
 
 VALID_REQUEST_NAME_CHARSET = ascii_letters + digits + '-_.'
 
@@ -129,9 +104,11 @@ def pushd(directory):
 
 def which(program):
     """Emulate the UNIX `which` command, trusting the user's environment"""
+
     def is_exe(fpath):
         """check if a file is executable for the current user"""
         return isfile(fpath) and access(fpath, X_OK)
+
     if DIRSEP in program:
         if is_exe(program):
             return program
@@ -144,7 +121,12 @@ def which(program):
     return None
 
 
-def file_write(src, dst, content=None, fail_on_exist=True, create_path=False, mode=None):
+def file_write(src,
+               dst,
+               content=None,
+               fail_on_exist=True,
+               create_path=False,
+               mode=None):
     """Return None on failure, raise exception on failure by default
 
        If `src` is None, touch the file `dst`
@@ -152,7 +134,8 @@ def file_write(src, dst, content=None, fail_on_exist=True, create_path=False, mo
        of `data`
     """
     if fail_on_exist is True and dst and (isfile(dst) or isdir(dst)):
-        ERROR('file "{}" already exists, are you doing something by mistake?'.format(dst))
+        ERROR('file "{}" already exists, are you doing something by mistake?'.
+              format(dst))
         exit(1)
     if create_path is True:
         mkdir_parents(dirname(dst))
@@ -167,7 +150,7 @@ def file_write(src, dst, content=None, fail_on_exist=True, create_path=False, mo
         raise
     except Exception as err:
         CRIT('Unexpected exception, investigate plz, kthx')
-        raise(err)
+        raise (err)
     if mode is not None:
         chmod(dst, mode)
     return dst
@@ -177,8 +160,7 @@ def mkdir_parents(dirpath, fail_on_exist=False, mode=None):
     """emulate mkdir -p behavior"""
     if fail_on_exist is True:
         if isdir(dirpath) or isfile(dirpath):
-            raise RuntimeError(
-                'path exists, remove or rethink your actions!!')
+            raise RuntimeError('path exists, remove or rethink your actions!!')
     path_stack = ''
     for element in dirpath.split(DIRSEP):
         if not isdir(dirpath):
@@ -252,6 +234,7 @@ def load_yaml_ordered(filename):
 
 def save_params_to_ca_root(params, yaml_file):
     """Write a YaML file to the CA root for use when issuing certs"""
+
     def strip_double_slashes(obj):
         """Recursively clean up paths in a dict"""
         if isinstance(obj, (str, unicode)):
@@ -268,12 +251,11 @@ def save_params_to_ca_root(params, yaml_file):
                 obj[key] = strip_double_slashes(value)
             return obj
         return obj
+
     params = strip_double_slashes(params)
     # yaml_file = strip_extension(yaml_file)[0]
     dump_yaml_plain(
-        params,
-        open(yaml_file, 'wb'),
-        default_flow_style=False)
+        dict(params), open(yaml_file, 'wb'), default_flow_style=False)
     with pushd(dirname(yaml_file)):
         ln(basename(yaml_file), 'ca.yml')
 
@@ -283,22 +265,12 @@ def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
     DEBUG('Using OPENSSL_CONF={}'.format(openssl_cnf_dst))
     openssl_cmd = which('openssl')
     if openssl_cmd is None:
-        raise RuntimeError(
-            'openssl command-line is not in your $PATH !!')
+        raise RuntimeError('openssl command-line is not in your $PATH !!')
     DEBUG('Sending out to {}'.format(path_ca_pem))
     cmdline = [
-        openssl_cmd,
-        'req',
-        '-batch',
-        '-x509',
-        '-newkey',
-        'rsa:4096',
-        '-out',
-        path_ca_pem,
-        '-outform',
-        'PEM',
-        '-days',
-        '36500']
+        openssl_cmd, 'req', '-batch', '-x509', '-newkey', 'rsa:4096', '-out',
+        path_ca_pem, '-outform', 'PEM', '-days', '36500'
+    ]
     DEBUG('SHELL: {}'.format(' '.join(cmdline)))
     check_call(
         cmdline,
@@ -308,6 +280,7 @@ def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
 
 def build_ca_filesystem(params, args):
     """Build the filesystem layout for a new CA"""
+
     def _fs(ca_root, filename):
         return join_path(ca_root, filename)
 
@@ -322,23 +295,19 @@ def build_ca_filesystem(params, args):
     mkdir_parents(_fs(root, 'requests'))
     mkdir_parents(_fs(root, 'crl'))
     mkdir_parents(_fs(root, 'certs'))
-    file_write(
-        None,
-        _fs(root,
-            'serial'),
-        content='01\n',
-        fail_on_exist=True)
+    file_write(None, _fs(root, 'serial'), content='01\n', fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt'), fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt.attr'), fail_on_exist=True)
 
-    yaml_file = join_path(
-        params['path_etc_dir'],
-        basename(args.yaml_filepath))
+    yaml_file = join_path(params['path_etc_dir'], basename(args.yaml_filepath))
 
     save_params_to_ca_root(params, yaml_file)
-    file_write(
-        join_path(CURDIR, 'examples', 'example_request.yml'),
-        params['path_example_request_file'], create_path=True)
+    copytree(
+        join_path(CURDIR, 'example-input-files', 'issue-cert'),
+        params['path_example_requests'])
+    # file_write(
+    #    join_path(CURDIR, 'example-input-filesissue-cert', 'example_request.yml'),
+    #    params['path_example_request_file'], create_path=True)
     file_write(
         params['src_path_simple_template'],
         params['path_issue_cert_template_cnf'],
@@ -357,8 +326,7 @@ def get_cnf(args):
     data['CURDIR'] = CURDIR
     template_input_vars = data
     resolved = nested_template(data, template_input_vars)
-    j2_env = Environment(
-        loader=FileSystemLoader(CURDIR), trim_blocks=True)
+    j2_env = Environment(loader=FileSystemLoader(CURDIR), trim_blocks=True)
     openssl_cnf_content = j2_env.get_template(
         args.template_filepath).render(resolved)
     return openssl_cnf_content, resolved
@@ -377,27 +345,31 @@ def openssl_cnf(args):
 
 def main():
     """Entrypoint"""
+
     def cmdline():
         parser = argparse.ArgumentParser(
             description='Certificate Authority Generator')
         parser.add_argument(
-            '-t', '--template',
+            '-t',
+            '--template',
             default=DEFAULT_TEMPLATE_PATH,
-            help='Name of template in template/ directory',
+            help='Name of template in template/ directory, defaults to a sane value, not required',
             required=False,
             dest='template_filepath',
             metavar='templates/openssl.cnf.j2')
         parser.add_argument(
-            '-y', '--yaml-config',
+            '-y',
+            '--yaml-config',
             default=DEFAULT_YAML_CONFIG_PATH,
-            help='CA configuration file in config/ directory, specific to your CA',
+            help='CA configuration file, see examples/ directory, specific to your CA',
             required=True,
             dest='yaml_filepath',
-            metavar='ca_configs/acme_widgets_ca.yml')
+            metavar='acme_widgets_ca.yml')
         return parser.parse_args()
 
     def init_yaml():
         """Make YaML dumps orderely"""
+
         def dict_representer(dumper, data):
             return dumper.represent_dict(data.iteritems())
 
@@ -407,18 +379,14 @@ def main():
         _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
         Dumper.add_representer(OrderedDict, dict_representer)
         Loader.add_constructor(_mapping_tag, dict_constructor)
-        Dumper.add_representer(str,
-                               SafeRepresenter.represent_str)
-        Dumper.add_representer(unicode,
-                               SafeRepresenter.represent_unicode)
+        Dumper.add_representer(str, SafeRepresenter.represent_str)
+        Dumper.add_representer(unicode, SafeRepresenter.represent_unicode)
 
     init_yaml()
     args = cmdline()
     resolved = openssl_cnf(args)
     path_ca_pem, installed_openssl_cnf = build_ca_filesystem(resolved, args)
-    generate_ca_keypair(
-        path_ca_pem,
-        installed_openssl_cnf)
+    generate_ca_keypair(path_ca_pem, installed_openssl_cnf)
     INFO('Created new Certificate Authority @ {}'.format(path_ca_pem))
 
 

@@ -1,6 +1,6 @@
 ## WARNING
 
-You shouldn't be using this. It does not make use of best practices, it intentionally leaves keys unencrypted, and the use-case is a very narrow one, where a user controlling the CA needs to generate signed certificates for short-term or development use. That said, if this can be useful for you, go for it.
+You shouldn't be using this unless you have carefully reviewed the `openssl.cnf.yml` file and are an very proficient in OpenSSL and its CA functionality. It does not make use of traditional best practices (see the *Caveat* section) and by default it intentionally leaves keys unencrypted; the use-case is a very narrow one, where a user controlling the CA also controls the components where the various certificates will be placed. This is anathema to those involved in the more traditional CSR -> Authority model, but it is for a different use-case, poorly explained below.
 
 ## First things first
 
@@ -12,6 +12,10 @@ This will give you a virtual environment with Jinja2 and PyYAML installed as the
 
 This tool was created for development use. A need arose where I needed to issue certificates used for mutually authenticated TLS. Because these were not standard "server" certificates, it made no sense to use a public CA, nor did it make sense to use a general purpose CA. It made more sense to create a very limited, dedicated CA, something very close to certificate pinning, but slightly short of that since I didn't control the applications that were enforcing the TLS authentication and they did not all support anything other than verifying the CA was the one that signed the cert- that is, there were no DN checks, etc.. As a quick example, let's say you have 500 systems and you need them to send system logs to a TLS enabled logstash endpoint. You don't want random garbage to be sent into this endpoint and you would prefer to reduce attack surface overall from any stranger able to hit the endpoint. You could use this tool to generate a CA called "Log Infrastructure Root CA" and generate a "Log Client" and "Logstash Server" keypair set. All in one or two commands, with no real hassle. If you need to add another certificate later, the CA will still be present on your disk and you can just copy the initial YaML file, modify it to your needs, and issue another one. The tool becomes more useful when you have 3-4 different scenarios like this and don't want to use the same CA for all of them. There's overhead involved in creating a CA and when a CA will only ever issue 3-4 certificates, this is a good way to do it quickly in a maintainable fashion.
 
+## Caveat
+
+This is not your traditional "Party A generates CSR, sends to Trusted Authority B who signes it and returns it" type of issuance model. There is only one player in this game, the trusted authority. This authority hands out pre-signed and generated certificates and keys. It is instructed to generated signed certififcates along with their keys, all in one shot. It is for infrastructural use, not for use by a traditional CA. Think of this as more closely related to certificate pinning than to a true CA a la the PKI model.
+
 ## Yet again
 
 Development use. Not production. If you don't know what you are doing, maybe you shouldn't be using this. If you haven't read the code and the configuration files, you definitely shouldn't be using this. If you're securing real, physical infrastructure or producing an organization-wide CA, you shouldn't be using this. Just saying..
@@ -20,64 +24,18 @@ Development use. Not production. If you don't know what you are doing, maybe you
 
 The tool makes heavy use of YaML and Jinja2 to create a CA and to create openssl.cnf files for creating and signing certificates. This means you will need to edit some YaML files. Luckily, there are already samples included. You can look around at them if you're curious about how things work, or what parameters are being used with the CA and other certificate/key generation commands
 
-### Step 1: Create a CA
+### Quick Usage
 
-Copy the file in conf/ca.yml.j2 to conf/my-test-ca.yml.j2. Edit this file to suit your needs, updating the fields that are common to certificates like the distinguished name values and such. Once complete, you can use create-ca
+Assume you choose to name your CA directory "MyCA"
 
-```
-(venv) debian@debian:~/quick-dirty-CA$ ./create-ca -h
-usage: create-ca [-h] [-t <templates/openssl.cnf.j2] [-y <etc/config.yml>]
+1. Copy a file from `./examples/create-ca/` and name it `myca.yml`
+2. Modify `myca.yml` with values specific to your CA (i.e. your company, business unit, etc.) and remember that the `ca_short_name` for this example should be `MyCA`
+3. Use `./create-ca -y myca.yml`, leaving out the optional template argument since the default CA parameters provided are pretty sane (as far as I know, you should double check the openssl.cnf.j2 file before using)
+4. Change directory to `~/CA/MyCA/`, this is the root directory of your new CA
+5. Copy an example from `./example_requests/` and specify the path to that new file using `-i` when using `bin/issue-cert`
+6. Check under `./requested/` and you will find various forms of your issued certififcate, including the private key which was generated dynamically
 
-Certificate Authority Generator
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -t <templates/openssl.cnf.j2, --template <templates/openssl.cnf.j2
-                        Name of template in template/ directory
-  -y <etc/config.yml>, --yaml-config <etc/config.yml>
-                        Name of YaML configuration file in config/ directory
-```
-
-By default, `create-ca` will use the sample files. This isn't what you want. You want to specify both parameters here. Try this:
-
-```
-$ ./create-ca -t templates/openssl.cnf.j2 -y conf/my-test-ca.yml.j2
-```
-
-After running this, you will find your CA in ~/CA/<somename> depending on how you modified the `my-test-ca.yml.j2` file. From this point forward, you can operate out of that directory until you have a need to create another CA in a different location
-
-### Step 2: Issue a certificate and have it signed by the CA
-
-First you should switch into the new CA directory. Modify the examples_request.yml file. This file is very intuitive. It is also very restrictive. It only allows you to set basic distinguished name parameters and subject alternative name values, both DNS and IP based. Make changes to this file and once you are done, you can use `bin/issue-cert`
-
-```
-$ bin/issue-cert -i examples_request.yml
-...
-Check that the request matches the signature
-Signature ok
-The Subject's Distinguished Name is as follows
-commonName            :ASN.1 12:'hostname.private'
-stateOrProvinceName   :ASN.1 12:'NJ'
-localityName          :ASN.1 12:'Hoboken'
-countryName           :PRINTABLE:'US'
-emailAddress          :IA5STRING:'root@domain.com'
-organizationName      :ASN.1 12:'WidgetsInc'
-organizationalUnitName:ASN.1 12:'Round Widgets Division'
-Certificate is to be certified until Apr 13 02:58:36 2023 GMT (1825 days)
-
-Write out database with 1 new entries
-Data Base Updated
-Certificate and private key have been generated and signed by CA !!
-  Key:         /home/debian/CA/widgetsInc/requested/request.2018-04-13.1523674715/server.key
-  Certificate: /home/debian/CA/widgetsInc/requested/request.2018-04-13.1523674715/server.crt
-  Combined:    /home/debian/CA/widgetsInc/requested/request.2018-04-13.1523674715/server.pem
-$ ls -l requested/
-```
-You will notice that the openssl.cnf file generated by the template and your YaML file is also preserved alongside the key and certificate files, in case you want to use it later or manually inspect it
-
-### Distributing / using the CA certificate
-
-The CA certificate is located in the root of the CA named `cacert.pem` and is hard to miss
+The CA certificate can be found in `~/CA/MyCA/requested/`, spotted most easily using `ls -lrt`
 
 ### Final notes
 

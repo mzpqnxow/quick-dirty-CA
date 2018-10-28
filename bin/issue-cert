@@ -43,38 +43,17 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime
 from errno import ENOENT
-from logging import (
-    basicConfig as configure_log_basic,
-    getLogger as get_logger,
-    DEBUG as LOGLEVEL_DEBUG,
-    INFO as LOGLEVEL_INFO,
-    WARN as LOGLEVEL_WARN,
-    ERROR as LOGLEVEL_ERROR,
-    CRITICAL as LOGLEVEL_CRITICAL)
-from os import (
-    mkdir,
-    environ,
-    chdir,
-    access,
-    X_OK,
-    getcwd,
-    chmod,
-    rename,
-    unlink)
-from os.path import (
-    dirname,
-    expanduser,
-    expandvars,
-    abspath,
-    isfile,
-    isdir,
-    join as join_path,
-    pathsep,
-    sep as DIRSEP)
+from logging import (basicConfig as configure_log_basic, getLogger as
+                     get_logger, DEBUG as LOGLEVEL_DEBUG, INFO as
+                     LOGLEVEL_INFO, WARN as LOGLEVEL_WARN, ERROR as
+                     LOGLEVEL_ERROR, CRITICAL as LOGLEVEL_CRITICAL)
+from os import (mkdir, environ, chdir, access, X_OK, getcwd, chmod, rename,
+                unlink)
+from os.path import (dirname, expanduser, expandvars, abspath, isfile, isdir,
+                     join as join_path, pathsep, sep as DIRSEP)
 from re import search as regex_search
 from shutil import copyfile
 from subprocess import check_call
-
 
 from jinja2 import Template, Environment
 from yaml import load as load_yaml_plain
@@ -100,6 +79,7 @@ DEFAULT_KEYSIZE = 4096
 
 def load_yaml(infile, self_template=False):
     """Load a YaML file with some special requirements"""
+
     def load_yaml_ordered(filename):
         """Load a YaML file as an OrderedDict
 
@@ -120,7 +100,8 @@ def load_yaml(infile, self_template=False):
                     else:
                         top_keys.append(match.group(1))
             if duped_keys:
-                raise RuntimeError('ERROR: duplicate keys: {}'.format(duped_keys))
+                raise RuntimeError(
+                    'ERROR: duplicate keys: {}'.format(duped_keys))
         with open(filename, 'r') as filefd:
             d_tmp = load_yaml_plain(filefd)
         return OrderedDict([(key, d_tmp[key]) for key in top_keys])
@@ -154,8 +135,10 @@ def load_yaml(infile, self_template=False):
             return tmp_list
         elif isinstance(data, (int, float)):
             return data
-        raise RuntimeError('unexpected and unsupported type "{}" encountered'.format(
-            type(data)))
+        raise RuntimeError(
+            'unexpected and unsupported type "{}" encountered'.format(
+                type(data)))
+
     # Load configuration/templates
     data = load_yaml_ordered(infile)
     if self_template is True:
@@ -171,7 +154,9 @@ def file_write(src, dst, content=None, fail_on_exist=True, create_path=False):
        If `src` is None and content is not None, seed it with the contents of `data`
     """
     if fail_on_exist is True and dst and (isfile(dst) or isdir(dst)):
-        raise RuntimeError('file already exists, please manually clean out the CA directory !!')
+        raise RuntimeError(
+            'file already exists, please manually clean out the CA directory !!'
+        )
     if create_path is True:
         mkdir_parents(dirname(dst))
     try:
@@ -205,7 +190,9 @@ def mkdir_parents(dirpath, fail_on_exist=False, mode=None):
     """emulate mkdir -p behavior"""
     if fail_on_exist is True:
         if isdir(dirpath) or isfile(dirpath):
-            raise RuntimeError('path already exists, please manually clean out the CA directory !!')
+            raise RuntimeError(
+                'path already exists, please manually clean out the CA directory !!'
+            )
     path_stack = ''
     for element in dirpath.split(DIRSEP):
         if not isdir(dirpath):
@@ -220,8 +207,10 @@ def mkdir_parents(dirpath, fail_on_exist=False, mode=None):
 
 def produce_openssl_cnf(ca_config, request_config):
     """Build openssl.cnf from a Jinja2 template"""
+
     def _get(dn, ca_config, key):
         return dn.get(key, ca_config[key])
+
     # No alternative DNS or IP names by default Jinja2 handles this case fine
     # by not producing the extension section
     dns_list = list()
@@ -231,19 +220,18 @@ def produce_openssl_cnf(ca_config, request_config):
 
     if issue_template is None:
         raise RuntimeError(
-            'CA configuration file contains no openssl.cnf template for issuance, exiting ...')
+            'CA configuration file contains no openssl.cnf template for issuance, exiting ...'
+        )
 
     dn = request_config.get('dn', None)
     if dn is None:
-        raise RuntimeError(
-            'No `dn` section in configuration, exiting ...')
+        raise RuntimeError('No `dn` section in configuration, exiting ...')
 
     # A new request must always have a CN, it can not be inherited from
     # the Certificate Authority config file like the other fields can
     cn = dn.get('commonName', None)
     if cn is None:
-        raise RuntimeError(
-            'cn is a mandatory field, exiting ...')
+        raise RuntimeError('cn is a mandatory field, exiting ...')
 
     # name = request_config.get('name', 'request')
     name = cn
@@ -263,7 +251,8 @@ def produce_openssl_cnf(ca_config, request_config):
 
     if filter(lambda value: len(value) != 2, (state, country)):
         raise RuntimeError(
-            'State and Country fields must be 2 characters, no more or less, exiting ...')
+            'State and Country fields must be 2 characters, no more or less, exiting ...'
+        )
 
     # If there is an alt_names section, prepare to build a configuration
     # with subjectAlternativeNames by populating the template data for
@@ -282,20 +271,27 @@ def produce_openssl_cnf(ca_config, request_config):
         'locality': locality,
         'email': email,
         'org': org,
-        'ou': ou}
+        'ou': ou
+    }
 
     template_content = open(issue_template, 'r').read()
-    openssl_cnf_content = Environment().from_string(template_content).render(template_filler_data)
+    openssl_cnf_content = Environment().from_string(template_content).render(
+        template_filler_data)
     mkdir_parents(openssl_cnf_outpath)
-    file_write(None, join_path(openssl_cnf_outpath, 'openssl.cnf'), content=openssl_cnf_content)
+    file_write(
+        None,
+        join_path(openssl_cnf_outpath, 'openssl.cnf'),
+        content=openssl_cnf_content)
     return openssl_cnf_outpath, cn
 
 
 def which(program):
     """Emulate the UNIX `which` command, trusting the user's environment"""
+
     def is_exe(fpath):
         """check if a file is executable for the current user"""
         return isfile(fpath) and access(fpath, X_OK)
+
     if DIRSEP in program:
         if is_exe(program):
             return program
@@ -312,24 +308,16 @@ def generate_certificate(working_path, keysize):
     """Execute the command to generate the (unsigned) certificate"""
     with pushd(working_path):
         environ['OPENSSL_CONF'] = join_path(working_path, 'openssl.cnf')
-        DEBUG('Using OPENSSL_CONF={}'.format(join_path(working_path, 'openssl.cnf')))
+        DEBUG('Using OPENSSL_CONF={}'.format(
+            join_path(working_path, 'openssl.cnf')))
         openssl_cmd = which('openssl')
         if openssl_cmd is None:
             raise RuntimeError('openssl command-line is not in your $PATH !!')
         cmdline = [
-            which('openssl'),
-            'req',
-            '-batch',
-            '-newkey',
-            'rsa:{}'.format(keysize),
-            '-keyout',
-            'tempkey.pem',
-            '-keyform',
-            'PEM',
-            '-out',
-            'tempreq.pem',
-            '-outform',
-            'PEM']
+            which('openssl'), 'req', '-batch', '-newkey',
+            'rsa:{}'.format(keysize), '-keyout', 'tempkey.pem', '-keyform',
+            'PEM', '-out', 'tempreq.pem', '-outform', 'PEM'
+        ]
         DEBUG('SHELL: {}'.format(' '.join(cmdline)))
         check_call(cmdline)
 
@@ -342,14 +330,9 @@ def sign_certificate(openssl_config_path, openssl_cnf):
         if openssl_cmd is None:
             raise RuntimeError('openssl command-line is not in your $PATH !!')
         cmdline = [
-            which('openssl'),
-            'ca',
-            '-batch',
-            '-in',
-            'tempreq.pem',
-            '-out',
-            'server_crt.pem',
-            '-batch']
+            which('openssl'), 'ca', '-batch', '-in', 'tempreq.pem', '-out',
+            'server_crt.pem', '-batch'
+        ]
         DEBUG('SHELL: {}'.format(' '.join(cmdline)))
         check_call(cmdline)
 
@@ -360,29 +343,22 @@ def postprocess(output_path, cacert_filepath, cn):
         if openssl_cmd is None:
             raise RuntimeError('openssl command-line is not in your $PATH !!')
         cmdline = [
-            which('openssl'),
-            'pkcs12',
-            '-export',
-            '-passin',
-            'pass:{}'.format(PFX_PASSWORD),
-            '-passout',
-            'pass:{}'.format(PFX_PASSWORD),
-            '-out',
-            '{}.pfx'.format(cn),
-            '-inkey',
-            '{}.key'.format(cn),
-            '-in',
-            '{}.crt'.format(cn),
-            '-certfile',
-            cacert_filepath]
+            which('openssl'), 'pkcs12', '-export', '-passin',
+            'pass:{}'.format(PFX_PASSWORD), '-passout',
+            'pass:{}'.format(PFX_PASSWORD), '-out', '{}.pfx'.format(cn),
+            '-inkey', '{}.key'.format(cn), '-in', '{}.crt'.format(cn),
+            '-certfile', cacert_filepath
+        ]
         DEBUG('SHELL: {}'.format(' '.join(cmdline)))
         check_call(cmdline)
+
     with pushd(output_path):
         rename('tempkey.pem', '{}.key'.format(cn))
         rename('server_crt.pem', '{}.crt'.format(cn))
         certificate_pem = open('{}.crt'.format(cn)).read()
         key_pem = open('{}.key'.format(cn)).read()
-        open('{}.pem'.format(cn), 'wb').write('\n'.join((certificate_pem, key_pem)))
+        open('{}.pem'.format(cn), 'wb').write('\n'.join((certificate_pem,
+                                                         key_pem)))
         unlink('tempreq.pem')
         make_pfx()
 
@@ -392,27 +368,35 @@ def main():
     global DEFAULT_KEYSIZE
     parser = ArgumentParser(description='Certificate Issuer Script')
     parser.add_argument(
-        '-i', '--input-request-file',
+        '-i',
+        '--input-request-file',
         help='Path to YaML configuration file with certificate information (see example_request.yml)',
         required=True,
         dest='request_filepath',
         metavar='<server1.yml>')
     args = parser.parse_args()
-    ca_config = load_yaml(join_path(CURDIR, '..', 'etc', 'ca.yml'))
-    cacert_filepath = ca_config['path_ca_cert']
-    request_config = load_yaml(args.request_filepath, self_template=True)
-    keysize = request_config.get('keysize', DEFAULT_KEYSIZE)
-    openssl_config, cn = produce_openssl_cnf(ca_config, request_config)
-    ca_openssl_cnf = ca_config['installed_openssl_cnf']
-    generate_certificate(openssl_config, keysize)
-    sign_certificate(openssl_config, ca_openssl_cnf)
-    postprocess(openssl_config, cacert_filepath, cn)
-    print('Certificate and private key have been generated and signed by CA !!')
-    print('  Key:         {}/{}'.format(openssl_config, '{}.key'.format(cn)))
-    print('  Certificate: {}/{}'.format(openssl_config, '{}.crt'.format(cn)))
-    print('  Combined:    {}/{}'.format(openssl_config, '{}.pem'.format(cn)))
-    print('  PKCS11/PFX:  {}/{}'.format(openssl_config, '{}.pfx'.format(cn)))
-    print('')
+    with pushd(CURDIR):  # Execute in the ~/CA/<caName>/ directory
+        ca_config = load_yaml(join_path(CURDIR, '..', 'etc', 'ca.yml'))
+        cacert_filepath = ca_config['path_ca_cert']
+        request_config = load_yaml(args.request_filepath, self_template=True)
+        keysize = request_config.get('keysize', DEFAULT_KEYSIZE)
+        openssl_config, cn = produce_openssl_cnf(ca_config, request_config)
+        ca_openssl_cnf = ca_config['installed_openssl_cnf']
+        generate_certificate(openssl_config, keysize)
+        sign_certificate(openssl_config, ca_openssl_cnf)
+        postprocess(openssl_config, cacert_filepath, cn)
+        print(
+            'Certificate and private key have been generated and signed by CA !!'
+        )
+        print('  Key:         {}/{}'.format(openssl_config,
+                                            '{}.key'.format(cn)))
+        print('  Certificate: {}/{}'.format(openssl_config,
+                                            '{}.crt'.format(cn)))
+        print('  Combined:    {}/{}'.format(openssl_config,
+                                            '{}.pem'.format(cn)))
+        print('  PKCS11/PFX:  {}/{}'.format(openssl_config,
+                                            '{}.pfx'.format(cn)))
+        print('')
 
 
 if __name__ == '__main__':

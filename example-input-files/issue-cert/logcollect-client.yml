@@ -1,0 +1,39 @@
+#
+# This is a simple example of a certificate request
+# If you leave out any of the `dn` values, defaults
+# will be pulled from the CA configuration file, so
+# beware !!
+#
+# This supports only very basic functionality. You
+# can create a certificate with a simple distinguished
+# name only or you can create a certificate with a
+# subject alternative names section. Subject alterative
+# names go under the `alt_names` section and can be either
+# IP or DNS alternative names
+#
+# From this file, an openssl.cnf file will be produced and
+# processed by the CA, producing a signed certificate and a
+# corresponding private key
+#
+#
+# Remember you don't need to have an IP or Hostname as a CN
+# In this example, imagine a fleet of mobile systems that
+# need to authenticate on a many to one case to a central
+# server. Each endpoint might receive this certificate and key
+# simply to provide best effort authentication to exposed log
+# collectors
+#
+---
+dn:
+  commonName: Managed Endpoint
+  stateName: NJ
+  localityName: Hoboken
+  countryName: US
+  emailAddress: root@domain.com
+  organizationName: Acme
+  organizationalUnitName: Acme Endpoint Logging
+
+alt_names:
+  ip: []
+  dns: []
+
