@@ -70,7 +70,7 @@ FATAL = LOG.fatal
 
 # Capture our current directory
 CURDIR = dirname(abspath(__file__))
-
+RUNDIR = getcwd()
 # This is a requirement for PFX, it is not a security measure
 # Transfer the file securely and delete once imported please
 PFX_PASSWORD = 'password'
@@ -88,22 +88,24 @@ def load_yaml(infile, self_template=False):
         This function loads a YaML file, preserving order. It also
         detects duplicates of keys
         """
-        with open(filename, 'r') as filefd:
-            lines = filefd.read().splitlines()
-            top_keys = []
-            duped_keys = []
-            for line in lines:
-                match = regex_search(r'^([A-Za-z0-9_]+) *:', line)
-                if match:
-                    if match.group(1) in top_keys:
-                        duped_keys.append(match.group(1))
-                    else:
-                        top_keys.append(match.group(1))
-            if duped_keys:
-                raise RuntimeError(
-                    'ERROR: duplicate keys: {}'.format(duped_keys))
-        with open(filename, 'r') as filefd:
-            d_tmp = load_yaml_plain(filefd)
+        from os import getcwd
+        with pushd(RUNDIR):
+            with open(filename, 'r') as filefd:
+                lines = filefd.read().splitlines()
+                top_keys = []
+                duped_keys = []
+                for line in lines:
+                    match = regex_search(r'^([A-Za-z0-9_]+) *:', line)
+                    if match:
+                        if match.group(1) in top_keys:
+                            duped_keys.append(match.group(1))
+                        else:
+                            top_keys.append(match.group(1))
+                if duped_keys:
+                    raise RuntimeError(
+                        'ERROR: duplicate keys: {}'.format(duped_keys))
+            with open(filename, 'r') as filefd:
+                d_tmp = load_yaml_plain(filefd)
         return OrderedDict([(key, d_tmp[key]) for key in top_keys])
 
     def nested_template(data, template_vars):
