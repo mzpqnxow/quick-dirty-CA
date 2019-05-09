@@ -14,7 +14,7 @@ This tool was created for development use. A need arose where I needed to issue 
 
 ## Caveat
 
-This is not your traditional "Party A generates CSR, sends to Trusted Authority B who signes it and returns it" type of issuance model. There is only one player in this game, the trusted authority. This authority hands out pre-signed and generated certificates and keys. It is instructed to generated signed certififcates along with their keys, all in one shot. It is for infrastructural use, not for use by a traditional CA. Think of this as more closely related to certificate pinning than to a true CA a la the PKI model.
+This is not your traditional "Party A generates CSR, sends to Trusted Authority B who signs it and returns it" type of issuance model. There is only one player in this game, the trusted authority. This authority hands out pre-signed and generated certificates and keys. It is instructed to generated signed certififcates along with their keys, all in one shot. It is for infrastructural use, not for use by a traditional CA. Think of this as more closely related to certificate pinning than to a true CA a la the PKI model.
 
 ## Yet again
 
@@ -36,6 +36,10 @@ Assume you choose to name your CA directory "MyCA"
 6. Check under `./requested/` and you will find various forms of your issued certififcate, including the private key which was generated dynamically
 
 The CA certificate can be found in `~/CA/MyCA/requested/`, spotted most easily using `ls -lrt`
+
+### Issuing certs down the line ...
+
+Remember that you need to enter the `quick-dirty-ca` virtualenv each time you want to issue a new certificate from the CA. Either that or you need to install the required libraries system-wide by hand (not recommended)
 
 ### Final notes
 
