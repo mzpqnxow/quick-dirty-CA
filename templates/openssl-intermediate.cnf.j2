@@ -1,0 +1,77 @@
+#
+# Jinja2 template for openssl.cnf used to create a simple Certificate Authority
+#
+
+[ ca ]
+{% if key_passphrase is defined %}prompt = no{% endif %}
+default_ca = CA_default
+
+[ CA_default ]
+dir =                           {{ ca_fullpath_root | replace("//", "/")/intermediate/ }}
+
+unique_subject = 	no
+certificate = 		$dir/cacert.pem
+private_key = 		$dir/private/cakey.pem
+database = 			$dir/index.txt
+certs =				$dir/certs 
+new_certs_dir = 	$dir/signedcerts
+serial = 			$dir/serial
+# RANDFILE = 		$dir/private/.rand
+RANDFILE = 			$dir/private/.rand
+default_days = 		1825
+default_md = 		{{ message_digest }}
+policy = 			CA_default_policy
+x509_extensions = 	CA_default_extensions
+copy_extensions = 	copy
+crl_dir = 			$dir/crl
+crlnumber = 		$dir/crlnumber
+crl = 				$dir/crl/ca.crl.pem
+crl_extensions = 	crl_ext
+default_crl_days = 	30
+preserve = 			no
+
+[ CA_default_policy ]
+commonName = 				supplied
+stateOrProvinceName = 		supplied
+countryName = 				supplied
+emailAddress = 				supplied
+organizationName = 			supplied
+organizationalUnitName = 	supplied
+localityName = 				supplied
+
+[ CA_default_extensions ]
+basicConstraints = 			critical, CA:true
+subjectKeyIdentifier =		hash
+authorityKeyIdentifier = 	keyid:always,issuer:always
+keyUsage = 					critical, digitalSignature, cRLSign, keyCertSign
+
+[ req ]
+default_bits = 				{{ default_rsa_keysize }}
+default_keyfile = 			{{ ca_fullpath_root | replace("//", "/") }}/private/cakey.pem
+encrypt_key = 				{% if not encrypt_key %}
+no
+{% else %}
+yes
+{% endif %}
+default_md = 				{{ message_digest }}
+{% if key_passphrase is defined %}input_password = {{ key_passphrase }}}{% endif %}
+distinguished_name = 		root_ca_distinguished_name
+x509_extensions = 			v3_ca
+prompt = no
+
+[ root_ca_distinguished_name ]
+commonName = 				{{ commonName }}
+stateOrProvinceName = 		{{ stateName }}
+countryName = 				{{ countryName }}
+emailAddress = 				{{ emailAddress }}
+organizationName = 			{{ organizationName }}
+organizationalUnitName = 	{{ organizationalUnitName}}
+localityName = 				{{ localityName }}
+
+[ v3_ca ]
+subjectKeyIdentifier = 		hash
+# authorityKeyIdentifier = 	keyid:always,issuer
+authorityKeyIdentifier =	keyid:always,issuer:always
+# basicConstraints = 		critical, CA:true
+basicConstraints =			CA:TRUE
+keyUsage = 					critical, digitalSignature, cRLSign, keyCertSign
