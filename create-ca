@@ -138,6 +138,7 @@ def file_write(src,
               format(dst))
         exit(1)
     if create_path is True:
+        mkdir_parents(join_path(dirname(dst), '..'))
         mkdir_parents(dirname(dst))
     try:
         if src is None:
@@ -260,6 +261,24 @@ def save_params_to_ca_root(params, yaml_file):
         ln(basename(yaml_file), 'ca.yml')
 
 
+def sign_intermediate(root_cert, root_key, openssl_cnf):
+    print('Signing intermediate')
+    cmdline = [
+        'sha512',
+        '-extensions',
+        'v3_ca',
+        '-key',
+        root_key,
+        '-out',
+        root_cert,
+        '-days',
+        '3650',
+        '-set_serial',
+        '0']
+    check_call(
+        cmdline)
+
+
 def generate_ca_keypair(path_ca_pem, openssl_cnf_dst):
     environ['OPENSSL_CONF'] = openssl_cnf_dst
     DEBUG('Using OPENSSL_CONF={}'.format(openssl_cnf_dst))
@@ -285,17 +304,22 @@ def build_ca_filesystem(params, args):
         return join_path(ca_root, filename)
 
     root = params['ca_fullpath_root']
+    mkdir_parents(root, mode=0700)
+    if args.create_intermediate is True:
+        root = join_path(root, 'intermediate')
+        mkdir_parents(root, mode=0755)
     # Mark the root 700, but still be paranoid with the other
     # private directories just in case the user is dumber than
     # usual
-    mkdir_parents(params['ca_fullpath_root'], mode=0700)
     mkdir_parents(_fs(root, 'etc'), mode=0700)
     mkdir_parents(_fs(root, 'private'), mode=0700)
     mkdir_parents(_fs(root, 'signedcerts'), mode=0700)
     mkdir_parents(_fs(root, 'requests'))
     mkdir_parents(_fs(root, 'crl'))
     mkdir_parents(_fs(root, 'certs'))
-    mkdir_parents(_fs(root, 'intermediates'))
+    if args.create_intermediate is False:
+        # Not supporting multiple levels of intermediate CAs right now
+        mkdir_parents(_fs(root, 'intermediate'), mode=0755)
     file_write(None, _fs(root, 'serial'), content='01\n', fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt'), fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt.attr'), fail_on_exist=True)
@@ -341,9 +365,16 @@ def openssl_cnf(args):
         content=openssl_cnf_content,
         fail_on_exist=False,
         create_path=True)
-    dump_yaml_plain(
-        resolved, open(resolved['path_ca_vars_yml_file'], 'wb'), default_flow_style=False)
-
+    import json
+    print(json.dumps(resolved, indent=2))
+    #if args.create_intermediate is False:
+    #    dump_yaml_plain(
+    #        resolved, open(
+    #            join_path(
+    #                resolved[
+    #                    'ca_fullpath_root'], 'intermediate', 'intermediate_vars.yml'), 'wb'),
+    #        default_flow_style=False,
+    #        create_path=True)
     return resolved
 
 
@@ -372,8 +403,10 @@ def main():
         parser.add_argument(
             '-i',
             '--intermediate',
-            help='Directory of root CA',
+            help='Create immediate (only use after creating root)',
+            action='store_true',
             required=False,
+            default=False,
             dest='create_intermediate')
         return parser.parse_args()
 
