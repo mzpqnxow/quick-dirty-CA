@@ -295,6 +295,7 @@ def build_ca_filesystem(params, args):
     mkdir_parents(_fs(root, 'requests'))
     mkdir_parents(_fs(root, 'crl'))
     mkdir_parents(_fs(root, 'certs'))
+    mkdir_parents(_fs(root, 'intermediates'))
     file_write(None, _fs(root, 'serial'), content='01\n', fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt'), fail_on_exist=True)
     file_write(None, _fs(root, 'index.txt.attr'), fail_on_exist=True)
@@ -340,6 +341,9 @@ def openssl_cnf(args):
         content=openssl_cnf_content,
         fail_on_exist=False,
         create_path=True)
+    dump_yaml_plain(
+        resolved, open(resolved['path_ca_vars_yml_file'], 'wb'), default_flow_style=False)
+
     return resolved
 
 
@@ -365,6 +369,12 @@ def main():
             required=True,
             dest='yaml_filepath',
             metavar='acme_widgets_ca.yml')
+        parser.add_argument(
+            '-i',
+            '--intermediate',
+            help='Directory of root CA',
+            required=False,
+            dest='create_intermediate')
         return parser.parse_args()
 
     def init_yaml():
